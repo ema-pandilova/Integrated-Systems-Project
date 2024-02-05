@@ -4,7 +4,7 @@ import { router } from "../router/Routes";
 import { PaginatedResponse } from "../models/pagination";
 import { store } from "../store/configureStore";
 
-const sleep= () => new Promise(resolve => setTimeout(resolve,500));
+const sleep = () => new Promise(resolve => setTimeout(resolve, 500));
 
 axios.defaults.baseURL = "http://localhost:5000/api/";
 axios.defaults.withCredentials = true;
@@ -17,22 +17,22 @@ axios.interceptors.request.use(config => {
     return config;
 })
 
-axios.interceptors.response.use( async response => {
+axios.interceptors.response.use(async response => {
     await sleep();
     const pagination = response.headers['pagination'];
-    if(pagination) {
+    if (pagination) {
         response.data = new PaginatedResponse(response.data, JSON.parse(pagination));
         return response;
     }
     return response
 }, (error: AxiosError) => {
-    const {data,status} = error.response as AxiosResponse;
+    const { data, status } = error.response as AxiosResponse;
     switch (status) {
         case 400:
-            if(data.errors){
+            if (data.errors) {
                 const modelStateErrors: string[] = [];
-                for(const key in data.errors){
-                    if(data.errors[key]){
+                for (const key in data.errors) {
+                    if (data.errors[key]) {
                         modelStateErrors.push(data.errors[key])
                     }
                 }
@@ -43,22 +43,46 @@ axios.interceptors.response.use( async response => {
         case 401:
             toast.error(data.title);
             break;
+        case 403:
+            toast.error('You are not allowed to do that!');
+            break;
         case 500:
-            router.navigate('/server-error', {state: {error: data}});
+            router.navigate('/server-error', { state: { error: data } });
             break;
         default:
             break;
-            
+
     }
     return Promise.reject(error.response);
 })
 
 const requests = {
-    get: (url: string, params?: URLSearchParams) => axios.get(url, {params}).then(responseBody),
-    post: (url:string, body : object) => axios.post(url, body).then(responseBody),
-    put: (url:string, body : object) => axios.put(url, body).then(responseBody),
-    delete: (url:string) => axios.delete(url).then(responseBody),
+    get: (url: string, params?: URLSearchParams) => axios.get(url, { params }).then(responseBody),
+    post: (url: string, body: object) => axios.post(url, body).then(responseBody),
+    put: (url: string, body: object) => axios.put(url, body).then(responseBody),
+    delete: (url: string) => axios.delete(url).then(responseBody),
+    postForm: (url: string, data: FormData) => axios.post(url, data, {
+        headers: { 'Content-type': 'multipart/form-data' }
+    }).then(responseBody),
+    putForm: (url: string, data: FormData) => axios.put(url, data, {
+        headers: { 'Content-type': 'multipart/form-data' }
+    }).then(responseBody)
 
+}
+
+function createFormData(item: any) {
+    const formData = new FormData();
+    for (const key in item) {
+        formData.append(key, item[key])
+    }
+    return formData;
+}
+
+
+const Admin = {
+    createProduct: (product: any) => requests.postForm('products', createFormData(product)),
+    updateProduct: (product: any) => requests.putForm('products', createFormData(product)),
+    deleteProduct: (id: number) => requests.delete(`products/${id}`)
 }
 
 const Account = {
@@ -77,38 +101,38 @@ const Orders = {
 
 const Basket = {
     get: () => requests.get('basket'),
-    addItem: (productId: number, quantity =1) => requests.post(`basket?productId=${productId}&quantity=${quantity}`, {}),
-    removeItem: (productId: number, quantity =1) => requests.delete(`basket?productId=${productId}&quantity=${quantity}`)
+    addItem: (productId: number, quantity = 1) => requests.post(`basket?productId=${productId}&quantity=${quantity}`, {}),
+    removeItem: (productId: number, quantity = 1) => requests.delete(`basket?productId=${productId}&quantity=${quantity}`)
 }
 
 const Catalog = {
     list: (params: URLSearchParams) => requests.get('products', params),
-    details: (id:number) => requests.get(`products/${id}`),
+    details: (id: number) => requests.get(`products/${id}`),
     fetchFilters: () => requests.get('products/filters')
- }
+}
 
- const TestErrors = {
+const TestErrors = {
     get400Error: () => requests.get('buggy/bad-request'),
     get401Error: () => requests.get('buggy/unauthorised'),
     get404Error: () => requests.get('buggy/not-found'),
     get500Error: () => requests.get('buggy/server-error'),
     getValidationError: () => requests.get('buggy/validation-error'),
- }
+}
 
- 
+
 const Payments = {
     createPaymentIntent: () => requests.post('payments', {})
 }
 
 
- const agent = {
-        Catalog,
-        TestErrors,
-        Basket,
-        Account,
-        Orders,
-        Payments
- }
+const agent = {
+    Catalog,
+    TestErrors,
+    Basket,
+    Account,
+    Orders,
+    Payments,
+    Admin
+}
 
- export default agent;
- 
+export default agent;
